@@ -1,16 +1,17 @@
 [![CI](https://github.com/matiasinsaurralde/powermetrics/actions/workflows/ci.yml/badge.svg)](https://github.com/matiasinsaurralde/powermetrics/actions/workflows/ci.yml)
 
-# Go Powermetrics
+# powermetrics
 
-A Go package for programmatically executing and parsing Apple's `powermetrics` command output. This package provides a clean interface to collect GPU power metrics and other system information on macOS.
+A Go package for programmatically running and parsing Apple's `powermetrics` command output on macOS, with a focus on GPU power metrics.
 
 ## Features
 
-- **Programmatic Execution**: Run `powermetrics` commands from Go code
-- **Flexible Configuration**: Configure sample count, output format, and samplers
-- **Structured Output**: Parse plist output into Go structs
-- **Validation**: Built-in validation for supported samplers
-- **GPU Power Metrics**: Full support for GPU power sampling
+- **GPU Power Metrics**: Collect and parse GPU idle ratio, active ratio, average power, and peak power
+- **Flexible Configuration**: Customize sample count, sample rate, output format, and samplers
+- **Multiple Output Formats**: Support for both text and plist (XML) output formats
+- **Type Safety**: Strongly typed configuration with constants for samplers and formats
+- **Error Handling**: Custom error types for unsupported samplers and formats
+- **Testable**: Mock command execution for reliable unit testing
 
 ## Installation
 
@@ -18,200 +19,192 @@ A Go package for programmatically executing and parsing Apple's `powermetrics` c
 go get github.com/matiasinsaurralde/powermetrics
 ```
 
-## Requirements
-
-- macOS (required for `powermetrics` command)
-- Go 1.24 or later
-
-## Usage
-
-### One-liner Example
+## Quick Start
 
 ```go
-import "github.com/matiasinsaurralde/powermetrics"
+package main
 
-result, err := powermetrics.Collect(nil)
-```
-
-### GPU Power Sampling
-
-```go
-import "github.com/matiasinsaurralde/powermetrics"
-
-config := &powermetrics.Config{SampleCount: 3}
-result, err := powermetrics.Collect(config.GPU())
-```
-
-### Custom Configuration
-
-```go
-import "github.com/matiasinsaurralde/powermetrics"
-
-config := &powermetrics.Config{
-    SampleCount: 5,
-    Format:      powermetrics.FormatPlist,
-    Samplers:    []powermetrics.Sampler{powermetrics.GPUPower},
-}
-result, err := powermetrics.Collect(config)
-```
-
-## Configuration Options
-
-### Config Struct
-
-```go
-type Config struct {
-    SampleCount   int           // Number of samples to collect
-    SampleInterval time.Duration // Interval between samples (e.g., 1*time.Second)
-    Format        Format        // Output format (text or plist)
-    Samplers      []Sampler     // List of samplers to use
-}
-```
-
-### Config Methods
-
-```go
-// Configure for GPU power sampling
-config := &powermetrics.Config{SampleCount: 1}
-gpuConfig := config.GPU()
-result, err := powermetrics.Collect(gpuConfig)
-```
-
-### Usage Examples
-
-```go
-// Single sample
-config := &powermetrics.Config{
-    SampleCount: 1,
-    Samplers:    []powermetrics.Sampler{powermetrics.GPUPower},
-}
-result, err := powermetrics.Collect(config)
-
-// Multiple samples with interval
-config := &powermetrics.Config{
-    SampleCount:   5,
-    SampleInterval: 1 * time.Second,
-    Format:        powermetrics.FormatPlist,
-    Samplers:      []powermetrics.Sampler{powermetrics.GPUPower},
-}
-result, err := powermetrics.Collect(config)
-
-// Access multiple samples
-if len(result.MultipleSamples) > 0 {
-    for i, sample := range result.MultipleSamples {
-        fmt.Printf("Sample %d: GPU Freq = %.2f MHz\n", i, sample.GPU.FreqHz/1e6)
-    }
-}
-```
-
-### Supported Formats
-
-- `powermetrics.FormatText` - Plain text output
-- `powermetrics.FormatPlist` - Property list (plist) output
-
-### Supported Samplers
-
-Currently supported samplers:
-- `gpu_power` - GPU power and frequency metrics
-
-## Output Structure
-
-When using `FormatPlist`, the output is parsed into structured data:
-
-```go
-type PlistRoot struct {
-    IsDelta      bool      `plist:"is_delta"`
-    ElapsedNS    int64     `plist:"elapsed_ns"`
-    HWModel      string    `plist:"hw_model"`
-    KernOSVer    string    `plist:"kern_osversion"`
-    KernBootArgs string    `plist:"kern_bootargs"`
-    KernBootTime int64     `plist:"kern_boottime"`
-    Timestamp    time.Time `plist:"timestamp"`
-    GPU          GPUInfo   `plist:"gpu"`
-}
-
-type GPUInfo struct {
-    FreqHz           float64      `plist:"freq_hz"`
-    IdleNS           int64        `plist:"idle_ns"`
-    IdleRatio        float64      `plist:"idle_ratio"`
-    DVFMStates       []DVFMState  `plist:"dvfm_states"`
-    SWRequestedState []SWReqState `plist:"sw_requested_state"`
-    SWState          []SWState    `plist:"sw_state"`
-    GPUEnergy        *int64       `plist:"gpu_energy,omitempty"`
-}
-```
-
-## Examples
-
-### Collecting GPU Metrics
-
-```go
 import (
-    "fmt"
-    "github.com/matiasinsaurralde/powermetrics"
+	"fmt"
+	"time"
+	"github.com/matiasinsaurralde/powermetrics"
 )
 
 func main() {
-    config := &powermetrics.Config{SampleCount: 1}
-    result, err := powermetrics.Collect(config.GPU())
-    if err != nil {
-        fmt.Printf("Error: %v\n", err)
-        return
-    }
-
-    if result.PlistData != nil {
-        gpu := result.PlistData.GPU
-        fmt.Printf("GPU Frequency: %.2f MHz\n", gpu.FreqHz/1e6)
-        fmt.Printf("GPU Idle Ratio: %.1f%%\n", gpu.IdleRatio*100)
-        fmt.Printf("Hardware Model: %s\n", result.PlistData.HWModel)
-        
-        // Print all DVFM states
-        for i, state := range gpu.DVFMStates {
-            fmt.Printf("DVFM State %d: %d Hz (%.1f%% used)\n", 
-                i, state.Freq, state.UsedRatio*100)
-        }
-    }
+	// Create a new powermetrics instance
+	pm := powermetrics.New()
+	
+	// Use default configuration for GPU power metrics
+	config := powermetrics.DefaultConfig().GPU()
+	
+	// Customize settings
+	config.SampleCount = 5
+	config.SampleRate = 1 * time.Second
+	
+	// Collect metrics
+	result, err := pm.Collect(config)
+	if err != nil {
+		panic(err)
+	}
+	
+	// Access GPU power data (single sample)
+	if result.PlistData != nil {
+		gpu := result.PlistData.GPU
+		fmt.Printf("GPU Frequency: %.2f Hz\n", gpu.FreqHz)
+		fmt.Printf("GPU Idle Ratio: %.2f%%\n", gpu.IdleRatio*100)
+		if gpu.GPUEnergy != nil {
+			fmt.Printf("GPU Energy: %d mJ\n", *gpu.GPUEnergy)
+		}
+	}
+	
+	// Access multiple samples (when SampleCount > 1)
+	if len(result.Samples) > 0 {
+		fmt.Printf("Collected %d samples\n", len(result.Samples))
+		for i, sample := range result.Samples {
+			gpu := sample.GPU
+			fmt.Printf("Sample %d: GPU Idle Ratio: %.2f%%\n", i, gpu.IdleRatio*100)
+		}
+	}
 }
 ```
 
-### Error Handling
+## Configuration
+
+The package uses a `Config` struct to control powermetrics execution:
 
 ```go
-config := &powermetrics.Config{
-    Samplers: []string{"gpu_power", "invalid_sampler"},
-}
-
-result, err := powermetrics.Collect(config)
-if err != nil {
-    // This will fail validation
-    fmt.Printf("Configuration error: %v\n", err)
-    return
+type Config struct {
+	SampleCount int           // Number of samples to collect
+	SampleRate  time.Duration // Time between samples
+	Format      Format        // Output format (text or plist)
+	Samplers    []Sampler     // List of samplers to use
 }
 ```
+
+### Default Configuration
+
+```go
+config := powermetrics.DefaultConfig()
+// SampleCount: 1
+// SampleRate: 5 seconds
+// Format: FormatText
+// Samplers: [GPUPower]
+```
+
+### GPU-Specific Configuration
+
+```go
+config := powermetrics.DefaultConfig().GPU()
+// SampleCount: 1
+// SampleRate: 5 seconds
+// Format: FormatPlist (required for GPU metrics)
+// Samplers: [GPUPower]
+```
+
+## Result Structure
+
+The `Result` struct provides access to the collected data:
+
+```go
+type Result struct {
+	RawOutput []byte                    // Raw output from powermetrics
+	PlistData *samplers.PlistRoot       // Single sample data (backward compatibility)
+	Samples   []*samplers.PlistRoot     // Multiple samples when SampleCount > 1
+}
+```
+
+- **Single Sample**: When `SampleCount = 1`, use `result.PlistData` for the parsed data
+- **Multiple Samples**: When `SampleCount > 1`, use `result.Samples` for all collected samples
+- **Backward Compatibility**: `result.PlistData` is always set to the first sample for compatibility
+
+## Supported Samplers
+
+Currently, the package supports the following samplers:
+
+- `GPUPower`: GPU power metrics (idle ratio, active ratio, average power, peak power)
+
+## Output Formats
+
+- `FormatText`: Raw text output from powermetrics
+- `FormatPlist`: XML plist format (required for structured data parsing)
+
+## Error Types
+
+The package defines custom error types for better error handling:
+
+- `ErrUnsupportedSampler`: When an unsupported sampler is specified
+- `ErrUnsupportedFormat`: When an unsupported format is specified
 
 ## Testing
 
-Run the tests:
+The package includes mock support for reliable unit testing:
+
+```go
+// In your tests
+xmlData, _ := os.ReadFile("testdata/gpu_power.xml")
+mockRunner := &powermetrics.MockCommandRunner{Output: xmlData}
+pm := powermetrics.NewWithRunner(mockRunner)
+result, err := pm.Collect(config)
+```
+
+## Samples
+
+The package includes example applications in the `samples/` directory:
+
+### Terminal Dashboard
+
+A real-time terminal dashboard using `termui` that displays GPU idle ratio with a sparkline chart.
+
+```bash
+cd samples/terminal
+go run main.go
+```
+
+Features:
+- Real-time GPU idle ratio display
+- Sparkline chart showing historical trends
+- Detailed GPU power metrics
+- Interactive controls (press 'q' to quit)
+
+### HTTP Server
+
+A simple HTTP server that exposes GPU metrics as JSON via a REST API.
+
+```bash
+cd samples/http
+go run main.go
+```
+
+Features:
+- REST API endpoint at `/metrics`
+- Pretty JSON output with timestamps
+- CORS support for web applications
+- GPU power metrics in structured format
+
+## Testing
+
+Run the test suite:
 
 ```bash
 go test ./...
 ```
 
-The test suite includes:
-- Configuration validation
-- Sampler validation
-- GPU power XML parsing with real data
-- JSON marshaling verification
+The tests include:
+- Default configuration validation
+- GPU power metrics parsing
+- Multiple sample parsing
+- Mock command execution testing
+- Error handling for unsupported configurations
 
-## Building
+## Requirements
 
-```bash
-go build -o powermetrics main.go
-```
+- macOS (powermetrics is only available on macOS)
+- Go 1.19 or later
+- `powermetrics` command available in PATH (included with macOS)
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file for details.
 
 ## Contributing
 
