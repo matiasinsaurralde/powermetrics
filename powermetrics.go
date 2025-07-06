@@ -2,7 +2,6 @@ package powermetrics
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -12,13 +11,46 @@ import (
 	howett_plist "howett.net/plist"
 )
 
-// Format represents the output format for powermetrics
-type Format string
+// CommandRunner interface for executing external commands
+type CommandRunner interface {
+	Run(name string, args ...string) ([]byte, error)
+}
 
-const (
-	FormatText  Format = "text"
-	FormatPlist Format = "plist"
-)
+// RealCommandRunner implements CommandRunner using exec.Command
+type RealCommandRunner struct{}
+
+func (r *RealCommandRunner) Run(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+
+// MockCommandRunner implements CommandRunner for testing
+type MockCommandRunner struct {
+	Output []byte
+	Err    error
+}
+
+func (m *MockCommandRunner) Run(name string, args ...string) ([]byte, error) {
+	return m.Output, m.Err
+}
+
+// Powermetrics struct holds the command runner
+type Powermetrics struct {
+	runner CommandRunner
+}
+
+// New creates a new Powermetrics instance with the real command runner
+func New() *Powermetrics {
+	return &Powermetrics{
+		runner: &RealCommandRunner{},
+	}
+}
+
+// NewWithRunner creates a new Powermetrics instance with a custom command runner
+func NewWithRunner(runner CommandRunner) *Powermetrics {
+	return &Powermetrics{
+		runner: runner,
+	}
+}
 
 // Sampler represents a powermetrics sampler
 type Sampler string
@@ -27,10 +59,18 @@ const (
 	GPUPower Sampler = "gpu_power"
 )
 
-// Custom errors
+// Format represents the output format
+type Format string
+
+const (
+	FormatText  Format = "text"
+	FormatPlist Format = "plist"
+)
+
+// Error types
 var (
-	ErrUnsupportedSampler = errors.New("unsupported sampler")
-	ErrUnsupportedFormat  = errors.New("unsupported format")
+	ErrUnsupportedSampler = fmt.Errorf("unsupported sampler")
+	ErrUnsupportedFormat  = fmt.Errorf("unsupported format")
 )
 
 // Supported samplers
@@ -40,10 +80,10 @@ var supportedSamplers = map[Sampler]bool{
 
 // Config holds the configuration for powermetrics execution
 type Config struct {
-	SampleCount    int
-	SampleInterval time.Duration
-	Format         Format
-	Samplers       []Sampler
+	SampleCount int
+	SampleRate  time.Duration
+	Format      Format
+	Samplers    []Sampler
 }
 
 // Result holds the parsed result from powermetrics execution
@@ -51,16 +91,16 @@ type Result struct {
 	RawOutput []byte
 	PlistData *samplers.PlistRoot
 	// For multiple samples
-	MultipleSamples []*samplers.PlistRoot
+	Samples []*samplers.PlistRoot
 }
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		SampleCount:    1,
-		SampleInterval: 5 * time.Second, // Default to 5 seconds like powermetrics CLI
-		Format:         FormatText,
-		Samplers:       []Sampler{GPUPower},
+		SampleCount: 1,
+		SampleRate:  5 * time.Second, // Default to 5 seconds like powermetrics CLI
+		Format:      FormatText,
+		Samplers:    []Sampler{GPUPower},
 	}
 }
 
@@ -70,10 +110,10 @@ func (c *Config) GPU() *Config {
 		c = DefaultConfig()
 	}
 	return &Config{
-		SampleCount:    c.SampleCount,
-		SampleInterval: c.SampleInterval,
-		Format:         FormatPlist,
-		Samplers:       []Sampler{GPUPower},
+		SampleCount: c.SampleCount,
+		SampleRate:  c.SampleRate,
+		Format:      FormatPlist,
+		Samplers:    []Sampler{GPUPower},
 	}
 }
 
@@ -107,7 +147,7 @@ func ValidateFormat(format Format) error {
 }
 
 // Collect executes powermetrics with the given configuration
-func Collect(config *Config) (*Result, error) {
+func (p *Powermetrics) Collect(config *Config) (*Result, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -134,14 +174,13 @@ func Collect(config *Config) (*Result, error) {
 		fmt.Sprintf("--samplers=%s", strings.Join(samplerStrings, ",")),
 	}
 
-	// Add sample interval if specified
-	if config.SampleInterval > 0 {
-		args = append(args, fmt.Sprintf("--sample-rate=%d", int(config.SampleInterval.Milliseconds())))
+	// Add sample rate if specified
+	if config.SampleRate > 0 {
+		args = append(args, fmt.Sprintf("--sample-rate=%d", int(config.SampleRate.Milliseconds())))
 	}
 
 	// Execute powermetrics command
-	cmd := exec.Command("powermetrics", args...)
-	output, err := cmd.Output()
+	output, err := p.runner.Run("powermetrics", args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute powermetrics: %w", err)
 	}
@@ -155,7 +194,7 @@ func Collect(config *Config) (*Result, error) {
 		// Try to parse as multiple samples first
 		samples, err := parseMultipleSamples(output)
 		if err == nil && len(samples) > 0 {
-			result.MultipleSamples = samples
+			result.Samples = samples
 			// Set the first sample as the main PlistData for backward compatibility
 			if len(samples) > 0 {
 				result.PlistData = samples[0]
@@ -176,30 +215,24 @@ func Collect(config *Config) (*Result, error) {
 
 // parseMultipleSamples attempts to parse multiple plist documents from the output
 func parseMultipleSamples(output []byte) ([]*samplers.PlistRoot, error) {
+	// Split by plist boundaries
+	parts := bytes.Split(output, []byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
+
 	var samples []*samplers.PlistRoot
 
-	// Split by XML declaration to find multiple plist documents
-	xmlDeclarations := []byte("<?xml version")
-	parts := bytes.Split(output, xmlDeclarations)
-
 	for i, part := range parts {
-		if i == 0 && len(part) == 0 {
-			// Skip empty part before first XML declaration
+		if i == 0 {
+			// Skip the first empty part
 			continue
 		}
 
-		if len(part) == 0 {
-			continue
-		}
-
-		// Reconstruct the XML document
-		xmlDoc := append(xmlDeclarations, part...)
+		// Reconstruct the XML with the header
+		xmlData := append([]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"), part...)
 
 		var parsed samplers.PlistRoot
-		decoder := howett_plist.NewDecoder(bytes.NewReader(xmlDoc))
+		decoder := howett_plist.NewDecoder(bytes.NewReader(xmlData))
 		if err := decoder.Decode(&parsed); err != nil {
-			// Skip invalid plist documents
-			continue
+			continue // Skip invalid plists
 		}
 
 		samples = append(samples, &parsed)

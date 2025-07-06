@@ -19,8 +19,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Expected SampleCount to be 1, got %d", config.SampleCount)
 	}
 
-	if config.SampleInterval != 5*time.Second {
-		t.Errorf("Expected SampleInterval to be 5 seconds, got %v", config.SampleInterval)
+	if config.SampleRate != 5*time.Second {
+		t.Errorf("Expected SampleRate to be 5 seconds, got %v", config.SampleRate)
 	}
 
 	if config.Format != FormatText {
@@ -181,7 +181,7 @@ func TestGPUPowerXMLUnmarshaling(t *testing.T) {
 		len(parsed.GPU.DVFMStates), len(parsed.GPU.SWRequestedState), len(parsed.GPU.SWState))
 }
 
-func TestMultipleSamplesXMLUnmarshaling(t *testing.T) {
+func TestSamplesXMLUnmarshaling(t *testing.T) {
 	// Read the test XML file with multiple samples
 	xmlData, err := os.ReadFile("testdata/gpu_power_multiple_samples.xml")
 	if err != nil {
@@ -251,4 +251,94 @@ func TestMultipleSamplesXMLUnmarshaling(t *testing.T) {
 
 	t.Logf("Successfully parsed %d samples with timestamps from %s to %s",
 		len(samples), firstTimestamp.Format(time.RFC3339), lastTimestamp.Format(time.RFC3339))
+}
+
+func TestCollectWithMock(t *testing.T) {
+	// Read test XML data
+	xmlData, err := os.ReadFile("testdata/gpu_power_multiple_samples.xml")
+	if err != nil {
+		t.Fatalf("Failed to read test XML: %v", err)
+	}
+
+	// Create mock runner
+	mockRunner := &MockCommandRunner{Output: xmlData}
+	pm := NewWithRunner(mockRunner)
+
+	// Test configuration
+	config := &Config{
+		SampleCount: 3,
+		SampleRate:  1 * time.Second,
+		Format:      FormatPlist,
+		Samplers:    []Sampler{GPUPower},
+	}
+
+	result, err := pm.Collect(config)
+	if err != nil {
+		t.Fatalf("Collect failed: %v", err)
+	}
+
+	// Check that we have multiple samples
+	if len(result.Samples) == 0 {
+		t.Error("Expected multiple samples, got none")
+	}
+
+	// Check that PlistData is set to the first sample for backward compatibility
+	if result.PlistData == nil {
+		t.Error("Expected PlistData to be set for backward compatibility")
+	}
+
+	// Verify that PlistData matches the first sample
+	if len(result.Samples) > 0 && result.PlistData != result.Samples[0] {
+		t.Error("Expected PlistData to be the first sample")
+	}
+}
+
+func TestCollectWithMockSingleSample(t *testing.T) {
+	// Read test XML data for single sample
+	xmlData, err := os.ReadFile("testdata/gpu_power.xml")
+	if err != nil {
+		t.Fatalf("Failed to read test XML: %v", err)
+	}
+
+	// Create mock runner
+	mockRunner := &MockCommandRunner{Output: xmlData}
+	pm := NewWithRunner(mockRunner)
+
+	// Test configuration
+	config := &Config{
+		SampleCount: 1,
+		SampleRate:  1 * time.Second,
+		Format:      FormatPlist,
+		Samplers:    []Sampler{GPUPower},
+	}
+
+	result, err := pm.Collect(config)
+	if err != nil {
+		t.Fatalf("Collect failed: %v", err)
+	}
+
+	// Check that we have a single sample
+	if result.PlistData == nil {
+		t.Error("Expected PlistData to be set")
+	}
+
+	// Check that GPU data is available
+	if result.PlistData.GPU.FreqHz <= 0 {
+		t.Error("Expected GPU frequency to be positive")
+	}
+}
+
+func TestNewAndNewWithRunner(t *testing.T) {
+	// Test New() creates a real runner
+	pm1 := New()
+	if pm1.runner == nil {
+		t.Error("Expected New() to create a runner")
+	}
+
+	// Test NewWithRunner() uses the provided runner
+	mockRunner := &MockCommandRunner{}
+	pm2 := NewWithRunner(mockRunner)
+	if pm2.runner != mockRunner {
+		t.Error("Expected NewWithRunner() to use the provided runner")
+	}
 }
