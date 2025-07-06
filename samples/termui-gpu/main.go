@@ -44,6 +44,7 @@ func main() {
 	spark := widgets.NewSparkline()
 	spark.LineColor = termui.ColorGreen
 	spark.Data = []float64{}
+	// Sparkline will automatically use the full width of its container (the grid)
 
 	sparkGroup := widgets.NewSparklineGroup(spark)
 	sparkGroup.Title = "GPU Idle Ratio History"
