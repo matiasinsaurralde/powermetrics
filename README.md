@@ -119,7 +119,6 @@ type GPUInfo struct {
 
 ```go
 import (
-    "encoding/json"
     "fmt"
     "github.com/matiasinsaurralde/powermetrics/powermetrics"
 )
