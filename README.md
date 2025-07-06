@@ -61,9 +61,10 @@ result, err := powermetrics.Collect(config)
 
 ```go
 type Config struct {
-    SampleCount int           // Number of samples to collect
-    Format      Format        // Output format (text or plist)
-    Samplers    []string      // List of samplers to use
+    SampleCount   int           // Number of samples to collect
+    SampleInterval time.Duration // Interval between samples (e.g., 1*time.Second)
+    Format        Format        // Output format (text or plist)
+    Samplers      []Sampler     // List of samplers to use
 }
 ```
 
@@ -74,6 +75,33 @@ type Config struct {
 config := &powermetrics.Config{SampleCount: 1}
 gpuConfig := config.GPU()
 result, err := powermetrics.Collect(gpuConfig)
+```
+
+### Usage Examples
+
+```go
+// Single sample
+config := &powermetrics.Config{
+    SampleCount: 1,
+    Samplers:    []powermetrics.Sampler{powermetrics.GPUPower},
+}
+result, err := powermetrics.Collect(config)
+
+// Multiple samples with interval
+config := &powermetrics.Config{
+    SampleCount:   5,
+    SampleInterval: 1 * time.Second,
+    Format:        powermetrics.FormatPlist,
+    Samplers:      []powermetrics.Sampler{powermetrics.GPUPower},
+}
+result, err := powermetrics.Collect(config)
+
+// Access multiple samples
+if len(result.MultipleSamples) > 0 {
+    for i, sample := range result.MultipleSamples {
+        fmt.Printf("Sample %d: GPU Freq = %.2f MHz\n", i, sample.GPU.FreqHz/1e6)
+    }
+}
 ```
 
 ### Supported Formats
@@ -203,9 +231,18 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 See the [samples/](samples/) directory for real-world usage examples.
 
-- **[term-gpu-usage](samples/term-gpu-usage/)**: Real-time terminal dashboard that graphs GPU idle ratio using [termui](https://github.com/gizak/termui). Continuously collects GPU power samples and displays them as a sparkline chart. Run with:
+- **[term-gpu-usage](samples/term-gpu-usage/)**: Real-time terminal dashboard that graphs GPU idle ratio using [termui](https://github.com/gizak/termui). Continuously collects GPU power samples every second and displays them as a sparkline chart. Run with:
 
   ```sh
   cd samples
   go run ./term-gpu-usage
-  ``` 
+  ```
+
+- **[httpserver](samples/httpserver/)**: HTTP server that exposes GPU power metrics via a REST API endpoint. Returns pretty-formatted JSON with comprehensive GPU data including frequency, idle ratio, and DVFM states. Collects samples every second. Run with:
+
+  ```sh
+  cd samples
+  go run ./httpserver
+  ```
+
+  Then access the API at `http://localhost:8080/gpu` 
