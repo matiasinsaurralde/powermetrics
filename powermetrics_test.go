@@ -29,27 +29,27 @@ func TestDefaultConfig(t *testing.T) {
 func TestValidateSamplers(t *testing.T) {
 	tests := []struct {
 		name      string
-		samplers  []string
+		samplers  []Sampler
 		expectErr bool
 	}{
 		{
 			name:      "valid sampler",
-			samplers:  []string{"gpu_power"},
+			samplers:  []Sampler{GPUPower},
 			expectErr: false,
 		},
 		{
 			name:      "invalid sampler",
-			samplers:  []string{"invalid_sampler"},
+			samplers:  []Sampler{"invalid_sampler"},
 			expectErr: true,
 		},
 		{
 			name:      "mixed valid and invalid",
-			samplers:  []string{"gpu_power", "invalid_sampler"},
+			samplers:  []Sampler{GPUPower, "invalid_sampler"},
 			expectErr: true,
 		},
 		{
 			name:      "empty samplers",
-			samplers:  []string{},
+			samplers:  []Sampler{},
 			expectErr: false,
 		},
 	}

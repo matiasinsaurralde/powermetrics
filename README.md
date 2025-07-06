@@ -50,7 +50,7 @@ import "github.com/matiasinsaurralde/powermetrics"
 config := &powermetrics.Config{
     SampleCount: 5,
     Format:      powermetrics.FormatPlist,
-    Samplers:    []string{"gpu_power"},
+    Samplers:    []powermetrics.Sampler{powermetrics.GPUPower},
 }
 result, err := powermetrics.Collect(config)
 ```

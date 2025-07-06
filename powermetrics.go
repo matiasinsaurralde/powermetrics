@@ -19,6 +19,13 @@ const (
 	FormatPlist Format = "plist"
 )
 
+// Sampler represents a powermetrics sampler
+type Sampler string
+
+const (
+	GPUPower Sampler = "gpu_power"
+)
+
 // Custom errors
 var (
 	ErrUnsupportedSampler = errors.New("unsupported sampler")
@@ -26,15 +33,15 @@ var (
 )
 
 // Supported samplers
-var supportedSamplers = map[string]bool{
-	"gpu_power": true,
+var supportedSamplers = map[Sampler]bool{
+	GPUPower: true,
 }
 
 // Config holds the configuration for powermetrics execution
 type Config struct {
 	SampleCount int
 	Format      Format
-	Samplers    []string
+	Samplers    []Sampler
 }
 
 // Result holds the parsed result from powermetrics execution
@@ -48,7 +55,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		SampleCount: 1,
 		Format:      FormatText,
-		Samplers:    []string{"gpu_power"},
+		Samplers:    []Sampler{GPUPower},
 	}
 }
 
@@ -60,7 +67,7 @@ func (c *Config) GPU() *Config {
 	return &Config{
 		SampleCount: c.SampleCount,
 		Format:      FormatPlist,
-		Samplers:    []string{"gpu_power"},
+		Samplers:    []Sampler{GPUPower},
 	}
 }
 
@@ -68,13 +75,13 @@ func (c *Config) GPU() *Config {
 func GetSupportedSamplers() []string {
 	samplers := make([]string, 0, len(supportedSamplers))
 	for sampler := range supportedSamplers {
-		samplers = append(samplers, sampler)
+		samplers = append(samplers, string(sampler))
 	}
 	return samplers
 }
 
 // ValidateSamplers checks if the provided samplers are supported
-func ValidateSamplers(samplers []string) error {
+func ValidateSamplers(samplers []Sampler) error {
 	for _, sampler := range samplers {
 		if !supportedSamplers[sampler] {
 			return fmt.Errorf("%w: %s", ErrUnsupportedSampler, sampler)
@@ -110,10 +117,15 @@ func Collect(config *Config) (*Result, error) {
 	}
 
 	// Build command arguments
+	samplerStrings := make([]string, len(config.Samplers))
+	for i, sampler := range config.Samplers {
+		samplerStrings[i] = string(sampler)
+	}
+
 	args := []string{
 		fmt.Sprintf("--sample-count=%d", config.SampleCount),
 		fmt.Sprintf("--format=%s", config.Format),
-		fmt.Sprintf("--samplers=%s", strings.Join(config.Samplers, ",")),
+		fmt.Sprintf("--samplers=%s", strings.Join(samplerStrings, ",")),
 	}
 
 	// Execute powermetrics command
