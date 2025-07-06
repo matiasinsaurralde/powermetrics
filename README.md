@@ -197,4 +197,15 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - This package requires the `powermetrics` command to be available on the system
 - GPU power metrics are only available on supported macOS systems
-- Some metrics may require elevated privileges 
+- Some metrics may require elevated privileges
+
+## Samples
+
+See the [samples/](samples/) directory for real-world usage examples.
+
+- **[term-gpu-usage](samples/term-gpu-usage/)**: Real-time terminal dashboard that graphs GPU idle ratio using [termui](https://github.com/gizak/termui). Continuously collects GPU power samples and displays them as a sparkline chart. Run with:
+
+  ```sh
+  cd samples
+  go run ./term-gpu-usage
+  ``` 
