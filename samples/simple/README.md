@@ -21,14 +21,14 @@ go run main.go
 The program will output:
 - GPU frequency in Hz
 - GPU idle ratio as a percentage
-- GPU energy consumption in mJ (if available)
+- GPU energy consumption in mW (if available)
 
 ## Example Output
 
 ```
 GPU Frequency: 338.00 Hz
 GPU Idle Ratio: 99.53%
-GPU Energy: 9 mJ
+GPU Energy: 9 mW
 Collected 5 samples
 Sample 0: GPU Idle Ratio: 99.53%
 Sample 1: GPU Idle Ratio: 98.25%

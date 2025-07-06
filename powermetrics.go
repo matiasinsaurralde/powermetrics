@@ -195,7 +195,7 @@ func (p *Powermetrics) Collect(config *Config) (*Result, error) {
 		samples, err := parseMultipleSamples(output)
 		if err == nil && len(samples) > 0 {
 			result.Samples = samples
-			// Set the first sample as the main PlistData for backward compatibility
+			// Set the first sample as the main PlistData
 			if len(samples) > 0 {
 				result.PlistData = samples[0]
 			}

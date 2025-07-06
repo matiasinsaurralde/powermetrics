@@ -30,7 +30,7 @@ func main() {
 		fmt.Printf("GPU Frequency: %.2f Hz\n", gpu.FreqHz)
 		fmt.Printf("GPU Idle Ratio: %.2f%%\n", gpu.IdleRatio*100)
 		if gpu.GPUEnergy != nil {
-			fmt.Printf("GPU Energy: %d mJ\n", *gpu.GPUEnergy)
+			fmt.Printf("GPU Energy: %d mW\n", *gpu.GPUEnergy)
 		}
 	}
 

@@ -53,7 +53,7 @@ func main() {
 		fmt.Printf("GPU Frequency: %.2f Hz\n", gpu.FreqHz)
 		fmt.Printf("GPU Idle Ratio: %.2f%%\n", gpu.IdleRatio*100)
 		if gpu.GPUEnergy != nil {
-			fmt.Printf("GPU Energy: %d mJ\n", *gpu.GPUEnergy)
+			fmt.Printf("GPU Energy: %d mW\n", *gpu.GPUEnergy)
 		}
 	}
 	
@@ -150,12 +150,27 @@ result, err := pm.Collect(config)
 
 The package includes example applications in the `samples/` directory:
 
+### Simple Example
+
+A basic example that demonstrates the core functionality of the package.
+
+```bash
+cd samples/simple
+go run main.go
+```
+
+Features:
+- Collects 5 GPU power samples with 1-second intervals
+- Displays GPU frequency, idle ratio, and energy consumption
+- Shows how to access both single and multiple samples
+- Uses the same code as the main README example
+
 ### Terminal Dashboard
 
 A real-time terminal dashboard using `termui` that displays GPU idle ratio with a sparkline chart.
 
 ```bash
-cd samples/terminal
+cd samples/termui-gpu
 go run main.go
 ```
 
@@ -170,12 +185,12 @@ Features:
 A simple HTTP server that exposes GPU metrics as JSON via a REST API.
 
 ```bash
-cd samples/http
+cd samples/httpserver
 go run main.go
 ```
 
 Features:
-- REST API endpoint at `/metrics`
+- REST API endpoint at `/gpu`
 - Pretty JSON output with timestamps
 - CORS support for web applications
 - GPU power metrics in structured format

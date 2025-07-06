@@ -282,9 +282,9 @@ func TestCollectWithMock(t *testing.T) {
 		t.Error("Expected multiple samples, got none")
 	}
 
-	// Check that PlistData is set to the first sample for backward compatibility
+	// Check that PlistData is set to the first sample
 	if result.PlistData == nil {
-		t.Error("Expected PlistData to be set for backward compatibility")
+		t.Error("Expected PlistData to be set")
 	}
 
 	// Verify that PlistData matches the first sample
