@@ -69,7 +69,7 @@ func TestValidateSamplers(t *testing.T) {
 
 func TestGPUPowerXMLUnmarshaling(t *testing.T) {
 	// Read the test XML file
-	xmlData, err := os.ReadFile("../testdata/gpu_power.xml")
+	xmlData, err := os.ReadFile("testdata/gpu_power.xml")
 	if err != nil {
 		t.Fatalf("Failed to read gpu_power.xml: %v", err)
 	}

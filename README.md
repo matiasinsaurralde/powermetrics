@@ -28,7 +28,7 @@ go get github.com/matiasinsaurralde/powermetrics
 ### One-liner Example
 
 ```go
-import "github.com/matiasinsaurralde/powermetrics/powermetrics"
+import "github.com/matiasinsaurralde/powermetrics"
 
 result, err := powermetrics.Collect(nil)
 ```
@@ -36,7 +36,7 @@ result, err := powermetrics.Collect(nil)
 ### GPU Power Sampling
 
 ```go
-import "github.com/matiasinsaurralde/powermetrics/powermetrics"
+import "github.com/matiasinsaurralde/powermetrics"
 
 config := &powermetrics.Config{SampleCount: 3}
 result, err := powermetrics.Collect(config.GPU())
@@ -45,7 +45,7 @@ result, err := powermetrics.Collect(config.GPU())
 ### Custom Configuration
 
 ```go
-import "github.com/matiasinsaurralde/powermetrics/powermetrics"
+import "github.com/matiasinsaurralde/powermetrics"
 
 config := &powermetrics.Config{
     SampleCount: 5,
@@ -120,7 +120,7 @@ type GPUInfo struct {
 ```go
 import (
     "fmt"
-    "github.com/matiasinsaurralde/powermetrics/powermetrics"
+    "github.com/matiasinsaurralde/powermetrics"
 )
 
 func main() {
