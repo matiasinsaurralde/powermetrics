@@ -18,6 +18,11 @@ const (
 	FormatPlist Format = "plist"
 )
 
+// Supported samplers
+var supportedSamplers = map[string]bool{
+	"gpu_power": true,
+}
+
 // Config holds the configuration for powermetrics execution
 type Config struct {
 	SampleCount int
@@ -52,12 +57,17 @@ func (c *Config) GPU() *Config {
 	}
 }
 
+// GetSupportedSamplers returns a list of supported sampler names
+func GetSupportedSamplers() []string {
+	samplers := make([]string, 0, len(supportedSamplers))
+	for sampler := range supportedSamplers {
+		samplers = append(samplers, sampler)
+	}
+	return samplers
+}
+
 // ValidateSamplers checks if the provided samplers are supported
 func ValidateSamplers(samplers []string) error {
-	supportedSamplers := map[string]bool{
-		"gpu_power": true,
-	}
-
 	for _, sampler := range samplers {
 		if !supportedSamplers[sampler] {
 			return fmt.Errorf("unsupported sampler: %s", sampler)
