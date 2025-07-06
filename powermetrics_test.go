@@ -3,8 +3,10 @@ package powermetrics
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/matiasinsaurralde/powermetrics/internal/samplers"
 	howett_plist "howett.net/plist"
@@ -17,12 +19,16 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Expected SampleCount to be 1, got %d", config.SampleCount)
 	}
 
+	if config.SampleInterval != 5*time.Second {
+		t.Errorf("Expected SampleInterval to be 5 seconds, got %v", config.SampleInterval)
+	}
+
 	if config.Format != FormatText {
 		t.Errorf("Expected Format to be FormatText, got %s", config.Format)
 	}
 
-	if len(config.Samplers) != 1 || config.Samplers[0] != "gpu_power" {
-		t.Errorf("Expected Samplers to be [gpu_power], got %v", config.Samplers)
+	if len(config.Samplers) != 1 || config.Samplers[0] != GPUPower {
+		t.Errorf("Expected Samplers to be [GPUPower], got %v", config.Samplers)
 	}
 }
 
@@ -173,4 +179,76 @@ func TestGPUPowerXMLUnmarshaling(t *testing.T) {
 
 	t.Logf("Successfully parsed GPU power data with %d DVFM states, %d SW requested states, and %d SW states",
 		len(parsed.GPU.DVFMStates), len(parsed.GPU.SWRequestedState), len(parsed.GPU.SWState))
+}
+
+func TestMultipleSamplesXMLUnmarshaling(t *testing.T) {
+	// Read the test XML file with multiple samples
+	xmlData, err := os.ReadFile("testdata/gpu_power_multiple_samples.xml")
+	if err != nil {
+		t.Fatalf("Failed to read gpu_power_multiple_samples.xml: %v", err)
+	}
+
+	// Parse the XML data using the parseMultipleSamples function directly
+	samples, err := parseMultipleSamples(xmlData)
+	if err != nil {
+		t.Fatalf("Failed to parse multiple samples: %v", err)
+	}
+
+	// Verify we got the expected number of samples
+	expectedSampleCount := 5
+	if len(samples) != expectedSampleCount {
+		t.Errorf("Expected %d samples, got %d", expectedSampleCount, len(samples))
+	}
+
+	// Verify each sample has valid data
+	for i, sample := range samples {
+		t.Run(fmt.Sprintf("sample_%d", i), func(t *testing.T) {
+			// Verify basic structure
+			if sample.HWModel == "" {
+				t.Errorf("Sample %d: Expected HWModel to be non-empty", i)
+			}
+
+			if sample.KernOSVer == "" {
+				t.Errorf("Sample %d: Expected KernOSVer to be non-empty", i)
+			}
+
+			if sample.Timestamp.IsZero() {
+				t.Errorf("Sample %d: Expected Timestamp to be non-zero", i)
+			}
+
+			// Verify GPU info
+			if sample.GPU.FreqHz <= 0 {
+				t.Errorf("Sample %d: Expected GPU frequency to be positive, got %f", i, sample.GPU.FreqHz)
+			}
+
+			if sample.GPU.IdleRatio < 0 || sample.GPU.IdleRatio > 1 {
+				t.Errorf("Sample %d: Expected GPU idle ratio to be between 0 and 1, got %f", i, sample.GPU.IdleRatio)
+			}
+
+			// Verify DVFM states
+			if len(sample.GPU.DVFMStates) == 0 {
+				t.Errorf("Sample %d: Expected at least one DVFM state", i)
+			}
+
+			// Verify SW requested states
+			if len(sample.GPU.SWRequestedState) == 0 {
+				t.Errorf("Sample %d: Expected at least one SW requested state", i)
+			}
+
+			// Verify SW states
+			if len(sample.GPU.SWState) == 0 {
+				t.Errorf("Sample %d: Expected at least one SW state", i)
+			}
+		})
+	}
+
+	// Test that samples have different timestamps (indicating they're different samples)
+	firstTimestamp := samples[0].Timestamp
+	lastTimestamp := samples[len(samples)-1].Timestamp
+	if firstTimestamp.Equal(lastTimestamp) {
+		t.Error("Expected samples to have different timestamps")
+	}
+
+	t.Logf("Successfully parsed %d samples with timestamps from %s to %s",
+		len(samples), firstTimestamp.Format(time.RFC3339), lastTimestamp.Format(time.RFC3339))
 }

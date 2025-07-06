@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/matiasinsaurralde/powermetrics/internal/samplers"
 	howett_plist "howett.net/plist"
@@ -39,23 +40,27 @@ var supportedSamplers = map[Sampler]bool{
 
 // Config holds the configuration for powermetrics execution
 type Config struct {
-	SampleCount int
-	Format      Format
-	Samplers    []Sampler
+	SampleCount    int
+	SampleInterval time.Duration
+	Format         Format
+	Samplers       []Sampler
 }
 
 // Result holds the parsed result from powermetrics execution
 type Result struct {
 	RawOutput []byte
 	PlistData *samplers.PlistRoot
+	// For multiple samples
+	MultipleSamples []*samplers.PlistRoot
 }
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		SampleCount: 1,
-		Format:      FormatText,
-		Samplers:    []Sampler{GPUPower},
+		SampleCount:    1,
+		SampleInterval: 5 * time.Second, // Default to 5 seconds like powermetrics CLI
+		Format:         FormatText,
+		Samplers:       []Sampler{GPUPower},
 	}
 }
 
@@ -65,9 +70,10 @@ func (c *Config) GPU() *Config {
 		c = DefaultConfig()
 	}
 	return &Config{
-		SampleCount: c.SampleCount,
-		Format:      FormatPlist,
-		Samplers:    []Sampler{GPUPower},
+		SampleCount:    c.SampleCount,
+		SampleInterval: c.SampleInterval,
+		Format:         FormatPlist,
+		Samplers:       []Sampler{GPUPower},
 	}
 }
 
@@ -128,6 +134,11 @@ func Collect(config *Config) (*Result, error) {
 		fmt.Sprintf("--samplers=%s", strings.Join(samplerStrings, ",")),
 	}
 
+	// Add sample interval if specified
+	if config.SampleInterval > 0 {
+		args = append(args, fmt.Sprintf("--sample-rate=%d", int(config.SampleInterval.Milliseconds())))
+	}
+
 	// Execute powermetrics command
 	cmd := exec.Command("powermetrics", args...)
 	output, err := cmd.Output()
@@ -141,13 +152,62 @@ func Collect(config *Config) (*Result, error) {
 
 	// Parse plist output if format is plist
 	if config.Format == FormatPlist {
-		var parsed samplers.PlistRoot
-		decoder := howett_plist.NewDecoder(bytes.NewReader(output))
-		if err := decoder.Decode(&parsed); err != nil {
-			return nil, fmt.Errorf("failed to decode plist output: %w", err)
+		// Try to parse as multiple samples first
+		samples, err := parseMultipleSamples(output)
+		if err == nil && len(samples) > 0 {
+			result.MultipleSamples = samples
+			// Set the first sample as the main PlistData for backward compatibility
+			if len(samples) > 0 {
+				result.PlistData = samples[0]
+			}
+		} else {
+			// Fall back to single sample parsing
+			var parsed samplers.PlistRoot
+			decoder := howett_plist.NewDecoder(bytes.NewReader(output))
+			if err := decoder.Decode(&parsed); err != nil {
+				return nil, fmt.Errorf("failed to decode plist output: %w", err)
+			}
+			result.PlistData = &parsed
 		}
-		result.PlistData = &parsed
 	}
 
 	return result, nil
+}
+
+// parseMultipleSamples attempts to parse multiple plist documents from the output
+func parseMultipleSamples(output []byte) ([]*samplers.PlistRoot, error) {
+	var samples []*samplers.PlistRoot
+
+	// Split by XML declaration to find multiple plist documents
+	xmlDeclarations := []byte("<?xml version")
+	parts := bytes.Split(output, xmlDeclarations)
+
+	for i, part := range parts {
+		if i == 0 && len(part) == 0 {
+			// Skip empty part before first XML declaration
+			continue
+		}
+
+		if len(part) == 0 {
+			continue
+		}
+
+		// Reconstruct the XML document
+		xmlDoc := append(xmlDeclarations, part...)
+
+		var parsed samplers.PlistRoot
+		decoder := howett_plist.NewDecoder(bytes.NewReader(xmlDoc))
+		if err := decoder.Decode(&parsed); err != nil {
+			// Skip invalid plist documents
+			continue
+		}
+
+		samples = append(samples, &parsed)
+	}
+
+	if len(samples) == 0 {
+		return nil, fmt.Errorf("no valid plist documents found")
+	}
+
+	return samples, nil
 }
