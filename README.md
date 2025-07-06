@@ -108,14 +108,13 @@ The `Result` struct provides access to the collected data:
 ```go
 type Result struct {
 	RawOutput []byte                    // Raw output from powermetrics
-	PlistData *samplers.PlistRoot       // Single sample data (backward compatibility)
+	PlistData *samplers.PlistRoot       // Single sample data
 	Samples   []*samplers.PlistRoot     // Multiple samples when SampleCount > 1
 }
 ```
 
 - **Single Sample**: When `SampleCount = 1`, use `result.PlistData` for the parsed data
 - **Multiple Samples**: When `SampleCount > 1`, use `result.Samples` for all collected samples
-- **Backward Compatibility**: `result.PlistData` is always set to the first sample for compatibility
 
 ## Supported Samplers
 
@@ -202,10 +201,6 @@ The tests include:
 - Go 1.19 or later
 - `powermetrics` command available in PATH (included with macOS)
 
-## License
-
-MIT License - see LICENSE file for details.
-
 ## Contributing
 
 1. Fork the repository
@@ -220,22 +215,6 @@ MIT License - see LICENSE file for details.
 - GPU power metrics are only available on supported macOS systems
 - Some metrics may require elevated privileges
 
-## Samples
+## License
 
-See the [samples/](samples/) directory for real-world usage examples.
-
-- **[term-gpu-usage](samples/term-gpu-usage/)**: Real-time terminal dashboard that graphs GPU idle ratio using [termui](https://github.com/gizak/termui). Continuously collects GPU power samples every second and displays them as a sparkline chart. Run with:
-
-  ```sh
-  cd samples
-  go run ./term-gpu-usage
-  ```
-
-- **[httpserver](samples/httpserver/)**: HTTP server that exposes GPU power metrics via a REST API endpoint. Returns pretty-formatted JSON with comprehensive GPU data including frequency, idle ratio, and DVFM states. Collects samples every second. Run with:
-
-  ```sh
-  cd samples
-  go run ./httpserver
-  ```
-
-  Then access the API at `http://localhost:8080/gpu` 
+MIT License - see LICENSE file for details.
