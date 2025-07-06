@@ -43,12 +43,11 @@ func main() {
 			return
 		case <-ticker.C:
 			// Collect a new sample
-			config := &powermetrics.Config{
-				SampleCount:    1,
-				SampleInterval: 1 * time.Second,
-				Samplers:       []powermetrics.Sampler{powermetrics.GPUPower},
-			}
-			result, err := powermetrics.Collect(config.GPU())
+			pm := powermetrics.New()
+			config := powermetrics.DefaultConfig().GPU()
+			config.SampleCount = 1
+			config.SampleRate = 1 * time.Second
+			result, err := pm.Collect(config)
 			if err != nil {
 				sparkGroup.Title = "Error: " + err.Error()
 			} else if result.PlistData != nil {

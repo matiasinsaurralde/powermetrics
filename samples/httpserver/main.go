@@ -40,13 +40,14 @@ func gpuMetricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Collect GPU metrics
 	config := &powermetrics.Config{
-		SampleCount:    1,
-		SampleInterval: 1 * time.Second,
-		Format:         powermetrics.FormatPlist,
-		Samplers:       []powermetrics.Sampler{powermetrics.GPUPower},
+		SampleCount: 1,
+		SampleRate:  1 * time.Second,
+		Format:      powermetrics.FormatPlist,
+		Samplers:    []powermetrics.Sampler{powermetrics.GPUPower},
 	}
 
-	result, err := powermetrics.Collect(config)
+	pm := powermetrics.New()
+	result, err := pm.Collect(config)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error collecting metrics: %v", err), http.StatusInternalServerError)
 		return
