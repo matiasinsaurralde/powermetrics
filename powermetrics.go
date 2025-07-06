@@ -2,6 +2,7 @@ package powermetrics
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -16,6 +17,12 @@ type Format string
 const (
 	FormatText  Format = "text"
 	FormatPlist Format = "plist"
+)
+
+// Custom errors
+var (
+	ErrUnsupportedSampler = errors.New("unsupported sampler")
+	ErrUnsupportedFormat  = errors.New("unsupported format")
 )
 
 // Supported samplers
@@ -70,16 +77,31 @@ func GetSupportedSamplers() []string {
 func ValidateSamplers(samplers []string) error {
 	for _, sampler := range samplers {
 		if !supportedSamplers[sampler] {
-			return fmt.Errorf("unsupported sampler: %s", sampler)
+			return fmt.Errorf("%w: %s", ErrUnsupportedSampler, sampler)
 		}
 	}
 	return nil
+}
+
+// ValidateFormat checks if the provided format is supported
+func ValidateFormat(format Format) error {
+	switch format {
+	case FormatText, FormatPlist:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s", ErrUnsupportedFormat, format)
+	}
 }
 
 // Collect executes powermetrics with the given configuration
 func Collect(config *Config) (*Result, error) {
 	if config == nil {
 		config = DefaultConfig()
+	}
+
+	// Validate format
+	if err := ValidateFormat(config.Format); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	// Validate samplers
