@@ -3,13 +3,13 @@ package types
 import "time"
 
 type BaseSample struct {
-	IsDelta      bool
-	ElapsedNS    int64
-	HWModel      string
-	KernOSVer    string
-	KernBootArgs string
-	KernBootTime int64
-	Timestamp    time.Time
+	IsDelta      bool      `plist:"is_delta"`
+	ElapsedNS    int64     `plist:"elapsed_ns"`
+	HWModel      string    `plist:"hw_model"`
+	KernOSVer    string    `plist:"kern_osversion"`
+	KernBootArgs string    `plist:"kern_bootargs"`
+	KernBootTime int64     `plist:"kern_boottime"`
+	Timestamp    time.Time `plist:"timestamp"`
 }
 
 type Sample interface {
